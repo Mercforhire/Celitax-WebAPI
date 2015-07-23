@@ -1,0 +1,2 @@
+#turn off redirrect from http to https
+RewriteEngine off

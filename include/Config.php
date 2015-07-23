@@ -1,0 +1,32 @@
+<?php
+
+define('DB_USERNAME', 'craveuser');
+define('DB_PASSWORD', 'craveuser');
+define('DB_HOST', 'cravedatabase.c6u2an6h6rez.us-west-2.rds.amazonaws.com');
+define('DB_NAME', 'celitax');
+define('DB_PORT', 3306);
+ 
+define('USER_CREATED_SUCCESSFULLY', 0);
+define('USER_CREATE_FAILED', 1);
+define('USER_ALREADY_EXISTED', 2);
+
+define('USER_ALREADY_REQUESTED_PAYMENT', 0);
+define('USER_DOES_NOT_EXIST', 1);
+define('USER_PAYMENT_REQUEST_SUCCESS', 2);
+
+define('USER_LOGIN_EMAIL_DOESNT_EXIST', 0);
+define('USER_LOGIN_PASSWORD_WRONG', 1);
+define('USER_LOGIN_SUCCESS', 2);
+
+define('UPLOAD_RECEIPT_FAILED_TO_COPY_TO_STORAGE', 0);
+define('UPLOAD_FAILED_TO_CREATE_STORAGE_FOLDER', 1);
+define('UPLOAD_RECEIPT_NO_PHOTOS_UPLOADED', 2);
+define('UPLOAD_RECEIPT_STORAGE_FOLDER_NOT_WRITABLE', 3);
+define('UPLOAD_RECEIPT_SUCCESSFULLY_COPIED_TO_STORAGE', 4);
+
+define('MODIFY_SUCCESS', 0);
+define('MODIFY_USER_NOT_EXIST', 1);
+define('MODIFY_INVALID_DATA_ACTION', 2);
+define('MODIFY_FAILED', 3);
+define('MODIFY_TRYING_INSERT_ALREADY_EXISTING', 4);
+?>
