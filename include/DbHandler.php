@@ -20,8 +20,9 @@ define('kKeyCatagories', 'Catagories');
 define('kKeyIdentifer', 'Identifer');
 define('kKeyName', 'Name');
 define('kKeyColor', 'Color');
-define('kKeyNationalAverageCost', 'NationalAverageCost');
+define('kKeyNationalAverageCosts', 'NationalAverageCosts');
 define('kKeyDataAction', 'DataAction');
+define('kKeyUnitType', 'UnitType');
 
 define('kKeyRed', 'Red');
 define('kKeyGreen', 'Green');
@@ -44,6 +45,8 @@ define('kKeyQuantity', 'Quantity');
 
 //TaxYear Dictionary
 define('kKeyTaxYears', 'TaxYears');
+
+$rootStorageFolder = '../../PhotosStorage/';
 
 class DbHandler
 {
@@ -74,33 +77,34 @@ class DbHandler
                                         `users`.`first_name`,
                                         `users`.`last_name`,
                                         `users`.`country`,
-                                        `users`.`city`,
-                                        `users`.`postal_code`,
                                         `users`.`api_key`
                                     FROM `celitax`.`users`
                                     WHERE email = ?");
         $stmt->bind_param("s", $email);
-        if ($stmt->execute()) {
-            $stmt->bind_result($first_name, $last_name, $country, $city, $postal_code, $api_key);
+        if ($stmt->execute())
+        {
+            $stmt->bind_result($first_name, $last_name, $country, $api_key);
             $stmt->fetch();
             $account = array(
-                    "first_name" => $first_name,
-                    "last_name" => $last_name,
-                    "country" => $country,
-                    "city" => $city,
-                    "postal_code" => $postal_code,
-                    "api_key" => $api_key
-                );
+                "first_name" => $first_name,
+                "last_name" => $last_name,
+                "country" => $country,
+                "api_key" => $api_key
+            );
             $stmt->close();
             return $account;
-        } else {
+        }
+        else
+        {
+            $stmt->close();
             return NULL;
         }
     }
+
     /**
      * Creating new user
      */
-    public function createUser($email, $password, $first_name, $last_name, $country, $city, $postal_code)
+    public function createUser($email, $password, $first_name, $last_name, $country)
     {
         // First check if user already existed in db
         if (!$this->isUserExists($email))
@@ -119,9 +123,9 @@ class DbHandler
             // insert query
             $stmt = $this->conn->prepare(
                     'INSERT INTO users'
-                    . '(email, password, api_key, first_name, last_name, country, city, postal_code) '
-                    . 'values(?, ?, ?, ?, ?, ?, ?, ?)');
-            $stmt->bind_param("ssssssss", $email, $passwordhash, $api_key, $first_name, $last_name, $country, $city, $postal_code);
+                    . '(email, password, api_key, first_name, last_name, country) '
+                    . 'values(?, ?, ?, ?, ?, ?)');
+            $stmt->bind_param("ssssss", $email, $passwordhash, $api_key, $first_name, $last_name, $country);
 
             $result = $stmt->execute();
 
@@ -142,7 +146,7 @@ class DbHandler
         else
         {
             // User with same email already existed in the db
-            return USER_ALREADY_EXISTED;
+            return USER_ALREADY_EXIST;
         }
     }
 
@@ -178,14 +182,38 @@ class DbHandler
             else
             {
                 // user password is incorrect
-                return USER_LOGIN_PASSWORD_WRONG;
+                return USER_PASSWORD_WRONG;
             }
         }
         else
         {
             $stmt->close();
             // user not existed with the email
-            return USER_LOGIN_EMAIL_DOESNT_EXIST;
+            return USER_DOESNT_EXIST;
+        }
+    }
+
+    /**
+     * Fetching user personal info by email
+     * @param String $email User email id
+     */
+    public function changeUserAccountInfo($userid, $firstname, $lastname, $country)
+    {
+        $stmt = $this->conn->prepare(
+                "UPDATE users 
+                 SET `first_name` = ?, `last_name` = ?, `country` = ?
+                 WHERE `userid` = ?
+                ");
+        $stmt->bind_param("sssi", $firstname, $lastname, $country, $userid);
+        if ($stmt->execute())
+        {
+            $stmt->close();
+            return UPDATE_ACCOUNT_SUCCESS;
+        }
+        else
+        {
+            $stmt->close();
+            return UPDATE_ACCOUNT_FAILED;
         }
     }
 
@@ -212,7 +240,7 @@ class DbHandler
      */
     public function getUserByEmail($email)
     {
-        $stmt = $this->conn->prepare("SELECT userid,email,api_key FROM users WHERE email=?");
+        $stmt = $this->conn->prepare("SELECT userid,email,api_key FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
         if ($stmt->execute())
         {
@@ -224,14 +252,123 @@ class DbHandler
                     "email" => $email,
                     "api_key" => $api_key
                 );
+                
+                $stmt->close();
+                return $result_user;
             }
-            $stmt->close();
-            return $result_user;
         }
         else
         {
             $stmt->close();
-            return NULL;
+        }
+        
+        return NULL;
+    }
+    
+    /**
+     * Delete user by userid
+     * @param String $userid userid
+     * @return BOOLEAN
+     */
+    public function deleteUser($userid)
+    {
+        $stmt = $this->conn->prepare("DELETE FROM `celitax`.`users` WHERE userid = ?");
+        $stmt->bind_param("i", $userid);
+        if ($stmt->execute())
+        {
+            $stmt->close();
+            return TRUE;
+        }
+        else
+        {
+            $stmt->close();
+            return FALSE;
+        }
+    }
+    
+    public function changeEmail($userid, $newEmail) 
+    {
+        //check if $newEmail already exist as a user
+        $result = $this->getUserByEmail($newEmail);
+        
+        if ($result != NULL)
+        {
+            return USER_CHANGE_EMAIL_ALREADY_EXIST;
+        }
+            
+        $stmt = $this->conn->prepare('
+                UPDATE `celitax`.`users`
+                SET `email` = ?
+                WHERE `userid` = ?
+		');
+        $stmt->bind_param("si", $newEmail, $userid);
+        
+        if ($stmt->execute())
+        {
+            $stmt->close();
+            return USER_CHANGE_EMAIL_SUCCESS;
+        }
+        else
+        {
+            $stmt->close();
+        }
+        
+        return USER_CHANGE_EMAIL_FAILED;
+    }
+    
+    public function changePassword($userid, $originalPassword, $newPassword) 
+    {
+        //find the user email
+        $email = $this->getUserEmailByID($userid);
+        
+        if ($email == NULL)
+        {
+            return USER_CHANGE_PASSWORD_FAILED;
+        }
+
+        //check if originalPassword is right
+        $result = $this->checkLogin($email, $originalPassword);
+        
+        if ($result == USER_PASSWORD_WRONG) 
+        {
+            return USER_CHANGE_PASSWORD_OLD_PASSWORD_WRONG;
+        } 
+        else if ($result == USER_LOGIN_SUCCESS) 
+        {
+            $result = $this->setNewPasswordForUser($userid, $newPassword);
+            
+            if ($result) 
+            {
+                return USER_CHANGE_PASSWORD_SUCCESS;
+            }
+        } 
+        
+        return USER_CHANGE_PASSWORD_FAILED;
+    }
+    
+    public function setNewPasswordForUser($userid, $newpassword) 
+    {
+        $passwordhash = password_hash($newpassword, PASSWORD_BCRYPT);
+        
+        //modify the existing entry
+        $stmt = $this->conn->prepare("
+                UPDATE `celitax`.`users` SET 
+                `password` = ?
+                WHERE `userid` = ?;
+        	");
+        $stmt->bind_param("si", $passwordhash, $userid);
+
+        $result = $stmt->execute();
+
+        $stmt->close();
+
+        // Check for successful update
+        if ($result) 
+        {
+            return true;
+        } else 
+        {
+            return false;
         }
     }
 
@@ -252,6 +389,7 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
             return NULL;
         }
     }
@@ -273,6 +411,7 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
             return NULL;
         }
     }
@@ -295,6 +434,7 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
             return NULL;
         }
     }
@@ -317,6 +457,7 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
             return NULL;
         }
     }
@@ -337,36 +478,28 @@ class DbHandler
         $stmt->close();
         return $num_rows > 0;
     }
-    
+
     /* ------------- common method ------------------ */
-    
+
     public function syncData($userid, $dataDictionary)
     {
         $catagoryDictionaries = $dataDictionary[kKeyCatagories];
         $receiptDictionaries = $dataDictionary[kKeyReceipts];
         $recordDictionaries = $dataDictionary[kKeyRecords];
         $taxYearDictionaries = $dataDictionary[kKeyTaxYears];
-        
+
         $this->conn->autocommit(false);
-        
+
         if ($this->modifyCatagories($userid, $catagoryDictionaries) == MODIFY_SUCCESS)
         {
-            //var_dump('Uploading Catagories success');
-            
             if ($this->modifyReceipts($userid, $receiptDictionaries) == MODIFY_SUCCESS)
             {
-                //var_dump('Uploading Receipts success');
-                
                 if ($this->modifyRecords($userid, $recordDictionaries) == MODIFY_SUCCESS)
                 {
-                    //var_dump('Uploading Records success');
-                    
                     if ($this->modifyTaxyear($userid, $taxYearDictionaries) == MODIFY_SUCCESS)
                     {
-                        //var_dump('Uploading Tax Years success');
-                        
                         $this->conn->autocommit(true);
-                        
+
                         return true;
                     }
                     else
@@ -388,33 +521,33 @@ class DbHandler
         {
             $this->conn->rollback();
         }
-        
+
         return false;
     }
-    
-    public function getDataBatchID($userid) 
+
+    public function getDataBatchID($userid)
     {
         $data = $this->downloadData($userid);
-        
+
         if ($data != NULL)
         {
             return md5(serialize($data));
         }
-        
+
         return NULL;
     }
-    
+
     public function downloadData($userid)
     {
         $catagoryDictionaries = $this->downloadCatagories($userid);
         $receiptDictionaries = $this->downloadReceipts($userid);
         $recordDictionaries = $this->downloadRecords($userid);
         $taxYearDictionaries = $this->downloadTaxYears($userid);
-        
+
         if (count($catagoryDictionaries) == 0 &&
-            count($receiptDictionaries) == 0 &&
-            count($recordDictionaries) == 0 &&
-            count($taxYearDictionaries) == 0)
+                count($receiptDictionaries) == 0 &&
+                count($recordDictionaries) == 0 &&
+                count($taxYearDictionaries) == 0)
         {
             //no data
 
@@ -422,12 +555,12 @@ class DbHandler
         }
 
         $dataDictionaries = array();
-        
+
         $dataDictionaries[kKeyCatagories] = $catagoryDictionaries;
         $dataDictionaries[kKeyReceipts] = $receiptDictionaries;
         $dataDictionaries[kKeyRecords] = $recordDictionaries;
         $dataDictionaries[kKeyTaxYears] = $taxYearDictionaries;
-        
+
         return $dataDictionaries;
     }
 
@@ -471,7 +604,7 @@ class DbHandler
         {
             return MODIFY_USER_NOT_EXIST;
         }
-        
+
         if (count($catagoryDictionaries) == 0)
         {
             return MODIFY_SUCCESS;
@@ -490,23 +623,23 @@ class DbHandler
                                              ?,
                                              ?);
                                             ';
-        
+
         $modifiyQuery = 'UPDATE `catagories` SET 
                         `name` = ?,
                         `color` = ?,
                         `national_average_cost` = ?
                         WHERE `identifier` = ? AND `userid` = ?;';
-        
+
         $deleteQuery = 'DELETE FROM `catagories` WHERE `identifier` = ? AND `userid` = ?';
-        
+
         for ($i = 0; $i < count($catagoryDictionaries); $i++)
         {
             $catagoryDictionary = $catagoryDictionaries[$i];
-            
+
             $identifier = $catagoryDictionary[kKeyIdentifer];
             $dataAction = $catagoryDictionary[kKeyDataAction];
             $catagoryName = $catagoryDictionary[kKeyName];
-            $nationalAverageCost = $catagoryDictionary[kKeyNationalAverageCost];
+            $nationalAverageCost = $catagoryDictionary[kKeyNationalAverageCosts];
             $colorDictionary = $catagoryDictionary[kKeyColor];
 
             $colorRed = $colorDictionary[kKeyRed];
@@ -525,8 +658,8 @@ class DbHandler
 
                 //add the new Catagory
                 $stmt = $this->conn->prepare($insertQuery);
-                
-                $stmt->bind_param("isssd", $userid, $identifier, $catagoryName, $colorString, $nationalAverageCost);
+
+                $stmt->bind_param("issss", $userid, $identifier, $catagoryName, $colorString, $nationalAverageCost);
 
                 if ($stmt->execute())
                 {
@@ -534,6 +667,7 @@ class DbHandler
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -544,10 +678,10 @@ class DbHandler
                 {
                     continue;
                 }
-                
+
                 $stmt = $this->conn->prepare($modifiyQuery);
-                
-                $stmt->bind_param("ssdsi", $catagoryName, $colorString, $nationalAverageCost, $identifier, $userid);
+
+                $stmt->bind_param("ssssi", $catagoryName, $colorString, $nationalAverageCost, $identifier, $userid);
 
                 if ($stmt->execute())
                 {
@@ -555,6 +689,7 @@ class DbHandler
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -565,19 +700,18 @@ class DbHandler
                 {
                     continue;
                 }
-                
+
                 $stmt = $this->conn->prepare($deleteQuery);
-                             
-                //var_dump($this->conn->error);
-                
+
                 $stmt->bind_param("si", $identifier, $userid);
-                
+
                 if ($stmt->execute())
                 {
                     $stmt->close();
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -585,7 +719,7 @@ class DbHandler
 
         return MODIFY_SUCCESS;
     }
-    
+
     public function downloadCatagories($userid)
     {
         $catagories = array();
@@ -597,7 +731,7 @@ class DbHandler
 		ORDER BY catagoryid
 		');
         $stmt->bind_param("i", $userid);
-        
+
         if ($stmt->execute())
         {
             $stmt->bind_result($catagoryid, $identifier, $name, $color, $national_average_cost);
@@ -617,7 +751,28 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
             return NULL;
+        }
+    }
+    
+    public function deleteCatagories($userid)
+    {
+        $stmt = $this->conn->prepare(
+                'DELETE FROM `celitax`.`catagories`
+                WHERE `userid` = ?
+		');
+        $stmt->bind_param("i", $userid);
+
+        if ($stmt->execute())
+        {
+            $stmt->close();
+            return TRUE;
+        }
+        else
+        {
+            $stmt->close();
+            return FALSE;
         }
     }
 
@@ -632,6 +787,74 @@ class DbHandler
         $num_rows = $stmt->num_rows;
         $stmt->close();
         return $num_rows > 0;
+    }
+    
+    public function getReceiptDateAndFilenames($userid, $receiptIDs)
+    {
+        $receiptInfos = array();
+        
+        foreach ($receiptIDs as $receiptID)
+        {
+            $stmt = $this->conn->prepare(
+                'SELECT `date_created`, `filenames`
+		FROM `receipts`
+                WHERE `userid` = ? AND `identifier` = ?
+		');
+        
+            $stmt->bind_param("is", $userid, $receiptID);
+
+            if ($stmt->execute())
+            {
+                $stmt->bind_result($date_created, $filenames);
+
+                if ( $stmt->fetch() )
+                {
+                    $receiptInfo = array(
+                        "identifier" => $receiptID,
+                        "date_created" => $date_created,
+                        "filenames" => $filenames
+                    );
+
+                    $receiptInfos[] = $receiptInfo;
+                }
+                
+                $stmt->close();
+            }
+        }
+        
+        return $receiptInfos;
+    }
+    
+    public function getReceiptInfosOfTaxYear($userid, $taxYear)
+    {
+        $receiptInfos = array();
+        
+        $stmt = $this->conn->prepare(
+                'SELECT `identifier`, `date_created`, `filenames`
+		FROM `receipts`
+                WHERE `userid` = ? AND `tax_year` = ?
+                ORDER BY `date_created` DESC
+		');
+        $stmt->bind_param("ii", $userid, $taxYear);
+
+        if ($stmt->execute())
+        {
+            $stmt->bind_result($receiptID, $date_created, $filenames);
+
+            while ($stmt->fetch())
+            {
+                $receiptInfo = array(
+                    "identifier" => $receiptID,
+                    "date_created" => $date_created,
+                    "filenames" => $filenames
+                );
+
+                $receiptInfos[] = $receiptInfo;
+            }
+        }
+
+        $stmt->close();
+        return $receiptInfos;
     }
 
     /**
@@ -662,7 +885,7 @@ class DbHandler
         {
             return MODIFY_SUCCESS;
         }
-        
+
         $insertQuery = 'INSERT INTO `celitax`.`receipts`
                                             (`userid`,
                                             `identifier`,
@@ -676,19 +899,19 @@ class DbHandler
                                              ?,
                                              ?);
                                             ';
-        
+
         $modifiyQuery = 'UPDATE `celitax`.`receipts`
                         SET
                         `filenames` = ?,
                         `tax_year` = ?
                         WHERE `identifier` = ? AND `userid` = ?;';
-        
+
         $deleteQuery = 'DELETE FROM `receipts` WHERE `identifier` = ? AND `userid` = ?;';
-        
+
         for ($i = 0; $i < count($receiptDictionaries); $i++)
         {
             $receiptDictionary = $receiptDictionaries[$i];
-            
+
             $identifier = $receiptDictionary[kKeyIdentifer];
             $fileNames = $receiptDictionary[kKeyFileNames];
             $dataAction = $receiptDictionary[kKeyDataAction];
@@ -708,7 +931,7 @@ class DbHandler
                     $fileNamesString = $fileNamesString . ',' . $fileNames[$index];
                 }
             }
-            
+
             if ($dataAction == DataActionInsert)
             {
                 //if a Receipt with identifier already exists, ignore
@@ -719,7 +942,7 @@ class DbHandler
 
                 //add the new Receipt
                 $stmt = $this->conn->prepare($insertQuery);
-                
+
                 $stmt->bind_param("isssd", $userid, $identifier, $fileNamesString, $dataCreated, $taxYear);
 
                 if ($stmt->execute())
@@ -728,7 +951,7 @@ class DbHandler
                 }
                 else
                 {
-                    //var_dump($stmt->error);
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -740,9 +963,9 @@ class DbHandler
                 {
                     continue;
                 }
-                
+
                 $stmt = $this->conn->prepare($modifiyQuery);
-                
+
                 $stmt->bind_param("sdsi", $fileNamesString, $taxYear, $identifier, $userid);
 
                 if ($stmt->execute())
@@ -751,6 +974,7 @@ class DbHandler
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -762,17 +986,21 @@ class DbHandler
                 {
                     continue;
                 }
-                
+
                 $stmt = $this->conn->prepare($deleteQuery);
-                
+
                 $stmt->bind_param("si", $identifier, $userid);
 
                 if ($stmt->execute())
                 {
                     $stmt->close();
+
+                    //Delete the associated images with the Receipt
+                    $this->deleteImagesIn($fileNames, $userid);
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -780,7 +1008,28 @@ class DbHandler
 
         return MODIFY_SUCCESS;
     }
-    
+
+    public function deleteImagesIn($fileNames, $userid)
+    {
+        global $rootStorageFolder;
+
+        $userFolderPath = $rootStorageFolder . $userid;
+
+        for ($index = 0; $index < count($fileNames); $index++)
+        {
+            $filename = $fileNames[$index];
+
+            $filename = $filename . '.jpg';
+
+            $filePath = $userFolderPath . '/' . $filename;
+
+            if (file_exists($filePath))
+            {
+                unlink($filePath);
+            }
+        }
+    }
+
     public function downloadReceipts($userid)
     {
         $receipts = array();
@@ -792,7 +1041,7 @@ class DbHandler
 		ORDER BY receiptid
 		');
         $stmt->bind_param("i", $userid);
-        
+
         if ($stmt->execute())
         {
             $stmt->bind_result($receiptid, $identifier, $filenames, $date_created, $tax_year);
@@ -812,10 +1061,31 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
             return NULL;
         }
     }
 
+    public function deleteReceipts($userid)
+    {
+        $stmt = $this->conn->prepare(
+                'DELETE FROM `celitax`.`receipts`
+                WHERE `userid` = ?
+		');
+        $stmt->bind_param("i", $userid);
+
+        if ($stmt->execute())
+        {
+            $stmt->close();
+            return TRUE;
+        }
+        else
+        {
+            $stmt->close();
+            return FALSE;
+        }
+    }
+    
     /* ------------- `records` table method ------------------ */
 
     public function existsRecord($userid, $identifier)
@@ -846,19 +1116,18 @@ class DbHandler
     public function modifyRecords($userid, $recordDictionaries)
     {
         //var_dump($recordDictionaries);
-        
         //check if user exists
         if ($this->getUserEmailByID($userid) == NULL)
         {
             //var_dump('MODIFY_USER_NOT_EXIST');
             return MODIFY_USER_NOT_EXIST;
         }
-        
+
         if (count($recordDictionaries) == 0)
         {
             return MODIFY_SUCCESS;
         }
-        
+
         $insertQuery = 'INSERT INTO `records`
                                             (
                                             `userid`,
@@ -866,36 +1135,40 @@ class DbHandler
                                             `catagoryid`,
                                             `receiptid`,
                                             `amount`,
-                                            `quantity`)
+                                            `quantity`,
+                                            `unit_type`)
                                             VALUES
                                             (?,
                                              ?,
                                              ?,
                                              ?,
                                              ?,
+                                             ?,
                                              ?);
                                             ';
-        
+
         $modifiyQuery = 'UPDATE `celitax`.`records`
                         SET
                         `catagoryid` = ?,
                         `receiptid` = ?,
                         `amount` = ?,
-                        `quantity` = ?
+                        `quantity` = ?,
+                        `unit_type` = ?
                         WHERE `identifier` = ? AND `userid` = ?;';
-        
+
         $deleteQuery = 'DELETE FROM `records` WHERE `identifier` = ? AND `userid` = ?;';
-        
+
         for ($i = 0; $i < count($recordDictionaries); $i++)
         {
             $receiptDictionary = $recordDictionaries[$i];
-            
+
             $identifier = $receiptDictionary[kKeyIdentifer];
             $receiptID = $receiptDictionary[kKeyReceiptID];
             $catagoryID = $receiptDictionary[kKeyCatagoryID];
             $amount = $receiptDictionary[kKeyAmount];
             $quantity = $receiptDictionary[kKeyQuantity];
             $dataAction = $receiptDictionary[kKeyDataAction];
+            $unitType = $receiptDictionary[kKeyUnitType];
 
             if ($dataAction == DataActionInsert)
             {
@@ -907,8 +1180,8 @@ class DbHandler
 
                 //add the new Record
                 $stmt = $this->conn->prepare($insertQuery);
-                
-                $stmt->bind_param("isssdi", $userid, $identifier, $catagoryID, $receiptID, $amount, $quantity);
+
+                $stmt->bind_param("isssdii", $userid, $identifier, $catagoryID, $receiptID, $amount, $quantity, $unitType);
 
                 if ($stmt->execute())
                 {
@@ -916,8 +1189,7 @@ class DbHandler
                 }
                 else
                 {
-                    //var_dump('MODIFY_FAILED');
-                    //var_dump($stmt->error);
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -931,7 +1203,7 @@ class DbHandler
                 }
                 
                 $stmt = $this->conn->prepare($modifiyQuery);
-                $stmt->bind_param("ssdisi", $catagoryID, $receiptID, $amount, $quantity, $identifier, $userid);
+                $stmt->bind_param("ssdiisi", $catagoryID, $receiptID, $amount, $quantity, $unitType, $identifier, $userid);
 
                 if ($stmt->execute())
                 {
@@ -939,6 +1211,7 @@ class DbHandler
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -950,9 +1223,9 @@ class DbHandler
                 {
                     continue;
                 }
-                
+
                 $stmt = $this->conn->prepare($deleteQuery);
-                
+
                 $stmt->bind_param("si", $identifier, $userid);
                 if ($stmt->execute())
                 {
@@ -960,6 +1233,7 @@ class DbHandler
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -967,22 +1241,22 @@ class DbHandler
 
         return MODIFY_SUCCESS;
     }
-    
+
     public function downloadRecords($userid)
     {
         $records = array();
 
         $stmt = $this->conn->prepare(
-                'SELECT `recordid`, `identifier`, `catagoryid`, `receiptid`, `amount`, `quantity`
+                'SELECT `recordid`, `identifier`, `catagoryid`, `receiptid`, `amount`, `quantity`, `unit_type`
 		FROM `records`
                 WHERE `userid` = ?
 		ORDER BY recordid
 		');
         $stmt->bind_param("i", $userid);
-        
+
         if ($stmt->execute())
         {
-            $stmt->bind_result($recordid, $identifier, $catagoryid, $receiptid, $amount, $quantity);
+            $stmt->bind_result($recordid, $identifier, $catagoryid, $receiptid, $amount, $quantity, $unitType);
             while ($stmt->fetch())
             {
                 $record = array(
@@ -991,7 +1265,8 @@ class DbHandler
                     "catagoryid" => $catagoryid,
                     "receiptid" => $receiptid,
                     "amount" => $amount,
-                    "quantity" => $quantity
+                    "quantity" => $quantity,
+                    "unit_type" => $unitType
                 );
                 $records[] = $record;
             }
@@ -1000,7 +1275,28 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
             return NULL;
+        }
+    }
+    
+    public function deleteRecords($userid)
+    {
+        $stmt = $this->conn->prepare(
+                'DELETE FROM `celitax`.`records`
+                 WHERE `userid` = ?
+		');
+        $stmt->bind_param("i", $userid);
+
+        if ($stmt->execute())
+        {
+            $stmt->close();
+            return TRUE;
+        }
+        else
+        {
+            $stmt->close();
+            return FALSE;
         }
     }
 
@@ -1016,14 +1312,14 @@ class DbHandler
         $stmt->close();
         return $num_rows > 0;
     }
-    
+
     /**
      * Go through $recordDictionaries, an array containing
      * dictionary of form:
-        {
-            "TaxYear" : 2013,
-            "DataAction" : 1
-        }
+      {
+      "TaxYear" : 2013,
+      "DataAction" : 1
+      }
      * 
      */
     public function modifyTaxyear($userid, $taxyearDictionaries)
@@ -1033,7 +1329,7 @@ class DbHandler
         {
             return MODIFY_USER_NOT_EXIST;
         }
-        
+
         if (count($taxyearDictionaries) == 0)
         {
             return MODIFY_SUCCESS;
@@ -1046,15 +1342,15 @@ class DbHandler
                                         (?,
                                          ?);
                                         ';
-        
+
         $deleteQuery = 'DELETE FROM `taxyears` WHERE `userid` = ? AND `year` = ?;';
-        
+
         for ($i = 0; $i < count($taxyearDictionaries); $i++)
         {
             $taxyearDictionary = $taxyearDictionaries[$i];
-            
+
             $taxYear = $taxyearDictionary[kKeyTaxYear];
-            $dataAction = $taxyearDictionary[kKeyDataAction];      
+            $dataAction = $taxyearDictionary[kKeyDataAction];
 
             //DataAction must be Insert
             if ($dataAction == DataActionInsert)
@@ -1075,6 +1371,7 @@ class DbHandler
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -1090,6 +1387,7 @@ class DbHandler
                 }
                 else
                 {
+                    $stmt->close();
                     return MODIFY_FAILED;
                 }
             }
@@ -1098,10 +1396,10 @@ class DbHandler
                 // ignore
             }
         }
-        
+
         return MODIFY_SUCCESS;
     }
-    
+
     public function downloadTaxYears($userid)
     {
         $taxyears = array();
@@ -1112,7 +1410,7 @@ class DbHandler
                 WHERE `userid` = ?
 		');
         $stmt->bind_param("i", $userid);
-        
+
         if ($stmt->execute())
         {
             $stmt->bind_result($taxyear);
@@ -1125,12 +1423,33 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
             return NULL;
         }
     }
     
+    public function deleteTaxYears($userid)
+    {
+        $stmt = $this->conn->prepare(
+                'DELETE FROM `celitax`.`taxyears`
+                WHERE `userid` = ?
+		');
+        $stmt->bind_param("i", $userid);
+
+        if ($stmt->execute())
+        {
+            $stmt->close();
+            return TRUE;
+        }
+        else
+        {
+            $stmt->close();
+            return FALSE;
+        }
+    }
+
     /* ------------- `feedbacks` table method ------------------ */
-    
+
     /**
      * return true for operation success, false for operation failure
      */
@@ -1147,7 +1466,127 @@ class DbHandler
         }
         else
         {
+            $stmt->close();
+            
             return false;
+        }
+    }
+
+    /* ------------- `subscription_ expiration_dates` table method ------------------ */
+
+    /**
+     * return true for operation success, false for operation failure
+     */
+    public function addExpirationDate($userid, $numberOfMonth)
+    {
+        $existingExpirationDate = $this->getLastestExpirationDate($userid);
+       
+        if ($existingExpirationDate != NULL)
+        {
+            $stmt = $this->conn->prepare("
+            SELECT `expiration_date`
+            FROM `subscription_expiration_dates`
+            WHERE userid = ? AND `expiration_date` > curdate()
+            ORDER BY subscriptionid DESC LIMIT 1;
+            ");
+            $stmt->bind_param("i", $userid);
+            if ($stmt->execute())
+            {
+                $stmt->store_result();
+                
+                //If the user has an expiration date in the future, this function to generate a 
+                //new expiration date that's X number of month after the previous expiration date.  
+                if ($stmt->num_rows > 0)
+                {
+                    $stmt = $this->conn->prepare("
+                        SET @lastest_date = ( SELECT `expiration_date`
+                                              FROM `subscription_expiration_dates`
+                                              WHERE userid = ? AND `expiration_date` > curdate()
+                                              ORDER BY subscriptionid DESC LIMIT 1 );");
+                    
+                    $stmt->bind_param("i", $userid);
+
+                    if ($stmt->execute())
+                    {
+                        $stmt = $this->conn->prepare("
+                            INSERT INTO subscription_expiration_dates(userid, expiration_date) 
+                            values(?, DATE_ADD(@lastest_date, INTERVAL ? MONTH) );");
+                    
+                        $stmt->bind_param("ii", $userid, $numberOfMonth);
+
+                        if ($stmt->execute())
+                        {
+                            $stmt->close();
+
+                            return ADD_EXPIRATION_DATE_SUCCESS;
+                        }
+                        else
+                        {
+                            $stmt->close();
+
+                            return ADD_EXPIRATION_DATE_FAILED;
+                        }
+                    }
+                    else
+                    {
+                        $stmt->close();
+
+                        return ADD_EXPIRATION_DATE_FAILED;
+                    }
+                }
+            }
+            else
+            {
+                $stmt->close();
+                return ADD_EXPIRATION_DATE_FAILED;
+            }
+        }
+        
+        //If the user doesn't have a expiration date at all or has one that's expired(in the past)
+        //this function will generate a new expiration date that's X number of month after today
+        
+        $stmt = $this->conn->prepare("
+            INSERT INTO subscription_expiration_dates(userid, expiration_date) 
+            values(?, DATE_ADD(curdate(), INTERVAL ? MONTH) );");
+        $stmt->bind_param("ii", $userid, $numberOfMonth);
+
+        if ($stmt->execute())
+        {
+            $stmt->close();
+
+            return ADD_EXPIRATION_DATE_SUCCESS;
+        }
+        else
+        {
+            $stmt->close();
+            
+            return ADD_EXPIRATION_DATE_FAILED;
+        }
+    }
+    
+    /**
+     * return true for operation success, false for operation failure
+     */
+    public function getLastestExpirationDate($userid)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT `expiration_date`
+            FROM `subscription_expiration_dates`
+            WHERE userid = ?
+            ORDER BY subscriptionid DESC LIMIT 1;
+            ");
+        $stmt->bind_param("i", $userid);
+        if ($stmt->execute())
+        {
+            $stmt->bind_result($expiration_date);
+            $stmt->fetch();
+            $stmt->close();
+            return $expiration_date;
+        }
+        else
+        {
+            $stmt->close();
+            return NULL;
         }
     }
 }
