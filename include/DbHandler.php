@@ -266,6 +266,35 @@ class DbHandler
     }
     
     /**
+     * Fetching user personal info by email
+     * @param String $email User email id
+     * @return Dictionary containing first_name,last_name,city,postal_code,gender
+     */
+    public function getUserDetailsByEmail($email)
+    {
+        $stmt = $this->conn->prepare("SELECT first_name,last_name,country FROM users WHERE email=?");
+        $stmt->bind_param("s", $email);
+        if ($stmt->execute())
+        {
+            $stmt->bind_result($first_name, $last_name, $country);
+            if ($stmt->fetch())
+            {
+                $result_user = array(
+                    "first_name" => $first_name,
+                    "last_name" => $last_name,
+                    "country" => $country
+                );
+            }
+            $stmt->close();
+            return $result_user;
+        }
+        else
+        {
+            return NULL;
+        }
+    }
+    
+    /**
      * Delete user by userid
      * @param String $userid userid
      * @return BOOLEAN
@@ -344,6 +373,48 @@ class DbHandler
         } 
         
         return USER_CHANGE_PASSWORD_FAILED;
+    }
+    
+    /**
+     * @param String $tokenID Token ID of the user's password to change
+     * @param String $newpassword Password to change to
+     * @return boolean
+     */
+    public function setNewPasswordForTokenID($tokenID, $newpassword)
+    {
+        $email = $this->verifyTokenID($tokenID);
+        
+        if ($email == NULL)
+        {
+            return false;
+        }
+        
+        $passwordhash = password_hash($newpassword, PASSWORD_BCRYPT);
+        
+        //modify the existing entry
+        $stmt = $this->conn->prepare("
+                UPDATE users SET 
+                `password` = ?
+                WHERE `email` = ?;
+        	");
+        
+        $stmt->bind_param("ss", $passwordhash, $email);
+
+        $result = $stmt->execute();
+
+        $stmt->close();
+
+        // Check for successful update
+        if ($result)
+        {
+            // User successfully update
+            return true;
+        }
+        else
+        {
+            // Failed to update user
+            return false;
+        }
     }
     
     public function setNewPasswordForUser($userid, $newpassword) 
@@ -477,6 +548,129 @@ class DbHandler
         $num_rows = $stmt->num_rows;
         $stmt->close();
         return $num_rows > 0;
+    }
+    
+    /* ------------- `password_reset_tokens` table method ------------------ */
+
+    /**
+     * @param String $email email to check in db
+     * @return boolean
+     */
+    private function isTokenForUserIDExists($userid)
+    {
+        $stmt = $this->conn->prepare("SELECT userid FROM password_reset_tokens WHERE userid=?");
+        $stmt->bind_param("i", $userid);
+        $stmt->execute();
+        $stmt->store_result();
+        $num_rows = $stmt->num_rows;
+        $stmt->close();
+        return $num_rows > 0;
+    }
+
+    /**
+     * Add a new password reset token for a choosen user 
+     * @param String $email Email of the user
+     * @return String
+     */
+    public function generateNewResetToken($email)
+    {
+        //if this email doesn't exist, bail
+        if (!$this->isUserExists($email))
+        {
+            return NULL;
+        }
+
+        //get userid of account
+        $userid = $this->getUserIDbyEmail($email);
+
+        //generate a tokenid
+        if ($userid)
+        {
+            $tokenid = md5(1290 * 3 + $userid);
+        }
+        else
+        {
+            return NULL;
+        }
+            
+        if ($this->isTokenForUserIDExists($userid))
+        {
+            //modify the existing entry
+            $stmt = $this->conn->prepare("
+                UPDATE password_reset_tokens SET 
+                `tokenid` = ?, `created_at` = CURRENT_TIMESTAMP
+                WHERE `userid` = ?;
+        	");
+            $stmt->bind_param("si", $tokenid, $userid);
+
+            $result = $stmt->execute();
+
+            $stmt->close();
+
+            // Check for successful update
+            if ($result)
+            {
+                // User successfully update
+                return $tokenid;
+            }
+            else
+            {
+                // Failed to update token
+                return NULL;
+            }
+        }
+        else
+        {
+            // insert new query
+            $stmt = $this->conn->prepare("
+        	INSERT INTO password_reset_tokens (userid,tokenid) 
+        	VALUES (?,?)
+        	");
+            $stmt->bind_param("is", $userid, $tokenid);
+
+            $result = $stmt->execute();
+
+            $stmt->close();
+
+            // Check for successful insertion
+            if ($result)
+            {
+                // token successfully inserted
+                return $tokenid;
+            }
+            else
+            {
+                // Failed to insert token
+                return NULL;
+            }
+        }
+    }
+    
+    /**
+     * Verify that the given tokenid is valid(belongs to a user) and was 
+     * generated within 4 hours.
+     * @param String $tokenid Token ID of the password reset request
+     * @return String Email of the owner of the token
+     */
+    public function verifyTokenID($tokenid)
+    {
+        $stmt = $this->conn->prepare("SELECT userid FROM password_reset_tokens WHERE tokenid=? AND created_at > (CURRENT_TIMESTAMP - INTERVAL 4 HOUR)");
+        $stmt->bind_param("s", $tokenid);
+        $stmt->execute();
+        $stmt->store_result();
+        $stmt->bind_result($userid);
+        $stmt->fetch();
+        $num_rows = $stmt->num_rows;
+        $stmt->close();
+
+        if ($num_rows == 0)
+        {
+            return NULL;
+        }
+        
+        $email = $this->getUserEmailByID($userid);
+            
+        return $email;
     }
 
     /* ------------- common method ------------------ */

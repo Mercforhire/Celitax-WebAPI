@@ -7,4 +7,8 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'Slim' => array($vendorDir . '/slim/slim'),
+    'Mailgun\\Tests' => array($vendorDir . '/mailgun/mailgun-php/tests'),
+    'Mailgun' => array($vendorDir . '/mailgun/mailgun-php/src'),
+    'Guzzle\\Tests' => array($vendorDir . '/guzzle/guzzle/tests'),
+    'Guzzle' => array($vendorDir . '/guzzle/guzzle/src'),
 );

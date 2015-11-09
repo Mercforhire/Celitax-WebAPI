@@ -1,6 +1,7 @@
 <?php
 
 require_once '../include/DbHandler.php';
+require_once '../include/EmailHandler.php';
 require_once '../include/Utils.php';
 require '.././libs/Slim/Slim.php';
 
@@ -269,6 +270,62 @@ $app->post('/login', function() use ($app)
         echoRespnse(400, $response);
     }
 });
+
+/**
+ * User Request password reset
+ * url - /forgetpassword
+ * method - post
+ * params - email
+ */
+$app->post('/forgetpassword', function() use ($app)
+{
+    // check for required params
+    verifyRequiredParams(array('email'));
+
+    // reading post params
+    $email = $app->request()->post('email');
+
+    $emailer = new EmailHandler();
+
+    $db = new DbHandler();
+    
+    $tokenid = $db->generateNewResetToken($email);
+
+    $response = array();
+    
+    if ($tokenid != NULL)
+    {
+        $accountInfoArray = $db->getUserDetailsByEmail($email);
+        $firstname = $accountInfoArray['first_name'];
+        $lastname = $accountInfoArray['last_name'];
+
+        $result = $emailer->sendPasswordResetEmailWithToken($email, $tokenid, $firstname, $lastname);
+        $resultcode = $result->http_response_code;
+        if ($resultcode == 200)
+        {
+            $response["error"] = false;
+            $response["account"] = $accountInfoArray;
+            echoRespnse(200, $response);
+        }
+        else
+        {
+            $response["error"] = true;
+            $response["message"] = "Failed to send a reset password email to selected user.";
+            echoRespnse(400, $response);
+        }
+    }
+    else
+    {
+        $response["error"] = true;
+        $response["message"] = "Sorry, this user account doesn't exist.";
+        echoRespnse(200, $response);
+    }
+});
+
+
+/**
+ * ----------- METHODS WITH AUTHENTICATION ---------------------------------
+ */
 
 /**
  * method POST
