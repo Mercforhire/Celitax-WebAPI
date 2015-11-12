@@ -1058,93 +1058,53 @@ $app->get('/get_expiration_date', 'authenticate', function()
  * params - year, tax year of the receipts we want to retrive
  * params - allReceipts, true for all receipts in that tax year, false for only selected receipts in that tax year
  * params - receiptIDs, IDs of the selected receipt
- * url - /get_receipts_info/
  */
-$app->post('/get_receipts_info', 'authenticate', function() use ($app)
+$app->post('/request_receipts_info', 'authenticate', function() use ($app)
 {
     global $user_email;
 
     // check for required params
+    verifyRequiredParams(array('email'));
     verifyRequiredParams(array('year'));
     verifyRequiredParams(array('allReceipts')); 
     
+    $email = $app->request->post('email');
     $taxyear = $app->request->post('year');
     $allReceipts = $app->request->post('allReceipts');
-
-    $db = new DbHandler();
     
-    $userid = $db->getUserIDbyEmail($user_email);
-    
-    $receiptInfos = array();
-    
-    $receiptsDateAndFilenames;
-    
-    //delete all temp files for this user first
-    deleteTempFolderForUser($userid);
+    $resultURL = "http://celitax.ca/receipt_view.php?email=$user_email&year=$taxyear&allreceipts=$allReceipts";
     
     if ($allReceipts != 1)
     {
+        //http://celitax.ca/receipt_view.php?email=leonchn84%40gmail.com&year=2015&allreceipts=0&receiptIDs=E88CE3B2-5656-4E01-961D-BA4E632529B5,6A01248C-37B8-40C9-8894-03F7259E7B0B
         $receiptIDsString = $app->request->post('receiptIDs');
-        $receiptIDs = explode(",", $receiptIDsString);
         
-        // for each Receipt ID, we need its receipt creation date, and receipt images filenames
-        $receiptsDateAndFilenames = $db->getReceiptDateAndFilenames($userid, $receiptIDs);
+        $resultURL = $resultURL . "&receiptIDs=$receiptIDsString";
+    }
+
+    $db = new DbHandler();
+    $accountInfoArray = $db->getUserDetailsByEmail($user_email);
+    $firstname = $accountInfoArray['first_name'];
+    $lastname = $accountInfoArray['last_name'];
+        
+    $emailer = new EmailHandler();
+    
+    $result = $emailer->sendReceiptDownloadLink($email, $resultURL, $firstname, $lastname);        
+    $resultcode = $result->http_response_code;
+    
+    if ($resultcode == 200)
+    {
+        $response["error"] = false;
+        $response["resultURL"] = $resultURL;
+        echoRespnse(200, $response);
     }
     else
     {
-        // for each Receipt ID, we need its receipt creation date, and receipt images filenames
-        $receiptsDateAndFilenames = $db->getReceiptInfosOfTaxYear($userid, $taxyear);
+        $response["error"] = true;
+        $response["message"] = "Failed to send an email to current user.";
+        $response["resultURL"] = $resultURL;
+        echoRespnse(400, $response);
     }
-    
-    if (is_array($receiptsDateAndFilenames))
-    {
-        // process each convert filename in receiptInfo to the actual URL
-        foreach ($receiptsDateAndFilenames as $receiptDateAndFilenames)
-        {
-            $receiptImagesURLs = array();
-
-            $filenamesString = $receiptDateAndFilenames['filenames'];
-            $filenames = explode(",", $filenamesString);
-
-            foreach ($filenames as $filename)
-            {
-                $filePath = getImageFilePath($userid, $filename);
-
-                if ($filePath != NULL)
-                {
-                    $filePath = str_replace("../..", "", $filePath);
-                    $filePath = '/crave' . $filePath;
-                    $fileURL = path2url($filePath);
-
-                    $receiptImagesURLs[] = $fileURL;
-                }
-                
-                $copySuccess = false;
-                
-                if ( createReceiptFolder($userid, $receiptDateAndFilenames['date_created']) )
-                {
-                    if ( copyReceiptImage($userid, $receiptDateAndFilenames['date_created'], $filename) )
-                    {
-                        $copySuccess = true;
-                    }
-                }
-            }
-
-            $receiptInfo = array(
-                "identifier" => $receiptDateAndFilenames['identifier'],
-                "date_created" => $receiptDateAndFilenames['date_created'],
-                "imageURLs" => $receiptImagesURLs
-            );
-            
-            $receiptInfos[] = $receiptInfo;
-        }
-        
-        zipReceipts($userid);
-    }
-
-    $response["error"] = false;
-    $response["receiptInfos"] = $receiptInfos;
-    echoRespnse(200, $response);
 });
 
 $app->run();

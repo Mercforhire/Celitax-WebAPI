@@ -361,7 +361,7 @@ function deleteTempFolderForUser($userid)
     }
 }
 
-function copyReceiptImage($userid, $receiptCreationDate, $filename)
+function copyReceiptImage($userid, $receiptCreationDate, $filename, $receiptNumber)
 {
     global $tempFolder;
     
@@ -380,20 +380,11 @@ function copyReceiptImage($userid, $receiptCreationDate, $filename)
         
         if ($originalFilepath != NULL)
         {
-            //TODO: rename filename to something more user friendly
-            $filenameComponents = explode("-", $filename);
-            
-            // sample: Receipt-D2C0F9E2-67AF-4E54-A421-A8BC5B05EABA-1
-            
-            $receiptNumber = $filenameComponents[count($filenameComponents) - 1];
-            
             $filename = 'Receipt-' . $receiptNumber . '.jpg';
 
             $filePath = $receiptFolderPath . '/' . $filename;
     
-            copy($originalFilepath, $filePath);
-            
-            return true;
+            return copy($originalFilepath, $filePath);
         }
     }
     
@@ -455,10 +446,21 @@ function zipReceipts($userid)
                         $zip->addFromString(basename($source), file_get_contents($source));
                     }
                 }
-                return $zip->close();
+                if ($zip->close())
+                {
+                    $filePath = str_replace("../..", "", $archiveName);
+                    $filePath = '/crave' . $filePath;
+                    $fileURL = path2url($filePath);
+                    
+                    return $fileURL;
+                }
+                else
+                {
+                    return NULL;
+                }
             }
         }
-        return false;
+        return NULL;
     }
 }
 
