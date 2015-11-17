@@ -777,6 +777,14 @@ $app->post('/submit_feedback', 'authenticate', function() use ($app)
     $userid = $db->getUserIDbyEmail($user_email);
 
     $result = $db->newFeedback($userid, $feedback_text);
+    
+    $accountInfoArray = $db->getUserDetailsByEmail($user_email);
+    $firstname = $accountInfoArray['first_name'];
+    $lastname = $accountInfoArray['last_name'];
+        
+    $emailer = new EmailHandler();
+    
+    $emailer->notifyAppFeedback($firstname . " " . $lastname, $user_email, $feedback_text);
 
     if ($result)
     {
@@ -1103,6 +1111,43 @@ $app->post('/request_receipts_info', 'authenticate', function() use ($app)
         $response["error"] = true;
         $response["message"] = "Failed to send an email to current user.";
         $response["resultURL"] = $resultURL;
+        echoRespnse(400, $response);
+    }
+});
+
+/**
+ * method POST
+ * params - report, the JSON of the complete report data
+ */
+$app->post('/upload_report_info', 'authenticate', function() use ($app)
+{
+    global $user_email;
+
+    // check for required params
+    verifyRequiredParams(array('email'));
+    verifyRequiredParams(array('report'));
+
+    $response = array();
+
+    $db = new DbHandler();
+
+    $userid = $db->getUserIDbyEmail($user_email);
+
+    $email = $app->request->post('email');
+    $rawjson = $app->request->post('report');
+    
+    $result = $db->addDataReport($userid, $rawjson);
+    
+    if ($result != NULL)
+    {
+        $response["error"] = false;
+        $response["reportID"] = $result;
+        echoRespnse(200, $response);
+    }
+    else
+    {
+        $response["error"] = true;
+        $response["message"] = 'Failed to add new report for user';
         echoRespnse(400, $response);
     }
 });

@@ -29,9 +29,9 @@ class EmailHandler
     public function sendPasswordResetEmailWithToken($email, $tokenid, $firstname, $lastname)
     {
         # Issue the call to the client.
-        $result = $this->mgClient->sendMessage("$this->domain", array('from' => 'Celitax Team <no-reply@celitax.ca>',
-            'to' => "Celitax user <$email>",
-            'subject' => 'Password Reset for Celitax',
+        $result = $this->mgClient->sendMessage("$this->domain", array('from' => 'CeliTax Team <no-reply@celitax.ca>',
+            'to' => "CeliTax user <$email>",
+            'subject' => 'Password Reset for CeliTax',
             'text' => "Hi $firstname $lastname,\n\nDon't worry about forgetting your password. "
             . "It happens to the best of us. Please click the link below and we will get you set up with a "
             . "new password!\n\n"
@@ -46,11 +46,31 @@ class EmailHandler
     public function sendReceiptDownloadLink($email, $linkURL, $firstname, $lastname)
     {
         # Issue the call to the client.
-        $result = $this->mgClient->sendMessage("$this->domain", array('from' => 'Celitax Team <no-reply@celitax.ca>',
-            'to' => "Celitax user <$email>",
-            'subject' => 'Receipts Link for Celitax',
+        $result = $this->mgClient->sendMessage("$this->domain", array('from' => 'CeliTax Team <no-reply@celitax.ca>',
+            'to' => "CeliTax user <$email>",
+            'subject' => 'Receipts Link for CeliTax',
             'text' => "Hi $firstname $lastname,\n\nHere is the link to view and download the receipts you have selected.\n\n"
             . "$linkURL"));
+        return $result;
+    }
+    
+    public function notifyAppFeedback($name, $email, $comments)
+    {
+        $admin_email = "info@celitax.ca";
+        $admin_email2 = "leon.chen@celitax.ca";
+        
+        $result = $this->mgClient->sendMessage("$this->domain",
+                  array('from'    => "$email",
+                        'to'      => "Admin <$admin_email>",
+                        'subject' => "Celitax App Feedback from $name",
+                        'text'    => "$comments"));
+        
+        $result2 = $this->mgClient->sendMessage("$this->domain",
+                  array('from'    => "$email",
+                        'to'      => "Admin <$admin_email2>",
+                        'subject' => "Celitax App Feedback from $name",
+                        'text'    => "$comments"));
+        
         return $result;
     }
 }

@@ -1783,6 +1783,79 @@ class DbHandler
             return NULL;
         }
     }
+    
+    /* ------------- `saved_reports` table methods ------------------ */
+    
+    public function addDataReport($userid, $data)
+    {
+        //find how many existing save data reports are there for this user
+        $num_rows = 0;
+        
+        $stmt = $this->conn->prepare("SELECT userid FROM saved_reports WHERE userid = ?");
+        $stmt->bind_param("i", $userid);
+        $stmt->execute();
+        $stmt->store_result();
+        $num_rows = $stmt->num_rows;
+        
+        if ($num_rows >= 5)
+        {
+            //delete the oldest data report for this user if there are 5 or more existing reports for the user
+            $stmt = $this->conn->prepare("
+            DELETE FROM `saved_reports` 
+            WHERE reportid IS NOT NULL 
+            ORDER BY reportid ASC 
+            LIMIT 1;
+            ");
+            if (!$stmt->execute())
+            {
+                //delete failed
+                $stmt->close();
+                return NULL;
+            }
+        }
+        
+        //add the new data report for this user
+        $stmt = $this->conn->prepare("
+            INSERT INTO `celitax`.`saved_reports`
+            (`userid`,
+             `data`)
+            VALUES
+            (?,
+             ?);
+            ");
+        $stmt->bind_param("is", $userid, $data);
+        if ($stmt->execute())
+        {
+            //grab the lastest report ID and return it
+            $stmt = $this->conn->prepare("
+            SELECT reportid FROM `saved_reports` 
+            WHERE reportid IS NOT NULL AND userid = ? 
+            ORDER BY reportid DESC 
+            LIMIT 1;
+            ");
+            $stmt->bind_param("i", $userid);
+            if ($stmt->execute())
+            {
+                $stmt->bind_result($reportID);
+                $stmt->fetch();
+                $stmt->close();
+                return $reportID;
+            }
+            else
+            {
+                $stmt->close();
+                return NULL;
+            }
+
+            $stmt->close();
+            return NULL;
+        }
+        else
+        {
+            $stmt->close();
+            return NULL;
+        }
+    }
 }
 
 ?>
