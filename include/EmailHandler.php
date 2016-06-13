@@ -49,8 +49,21 @@ class EmailHandler
         $result = $this->mgClient->sendMessage("$this->domain", array('from' => 'CeliTax Team <no-reply@celitax.ca>',
             'to' => "CeliTax user <$email>",
             'subject' => 'Receipts Link for CeliTax',
-            'text' => "Hi $firstname $lastname,\n\nHere is the link to view and download the receipts you have selected.\n\n"
-            . "$linkURL"));
+            'text' => "Hi $firstname $lastname,\n\nThe link to view and download the receipts that you have requested, please click here:\n$linkURL"));
+        return $result;
+    }
+    
+    /**
+     * Send a email with the link to view the year summary
+     * @return result of the email sender
+     */
+    public function sendYearSummaryLink($email, $linkURL, $firstname, $lastname)
+    {
+        # Issue the call to the client.
+        $result = $this->mgClient->sendMessage("$this->domain", array('from' => 'CeliTax Team <no-reply@celitax.ca>',
+            'to' => "CeliTax user <$email>",
+            'subject' => 'Year Summary for CeliTax',
+            'text' => "Hi $firstname $lastname,\n\nThe link to view and print the year-end summary that you have requested, please click here:\n$linkURL"));
         return $result;
     }
     
@@ -71,6 +84,18 @@ class EmailHandler
                         'subject' => "Celitax App Feedback from $name",
                         'text'    => "$comments"));
         
+        return $result;
+    }
+    
+    public function sendWelcomeMail($email) {
+        $welcome_page = file_get_contents('EmailHTMLs/WelcomeEmail.html', FILE_USE_INCLUDE_PATH);
+        
+        # Issue the call to the client.
+        $result = $this->mgClient->sendMessage("$this->domain",
+                  array('from'    => 'CeliTax Team <no-reply@celitax.ca>',
+                        'to'      => "New CeliTax user <$email>",
+                        'subject' => 'Welcome to Celitax!',
+                        'html'    => $welcome_page));
         return $result;
     }
 }

@@ -1786,6 +1786,28 @@ class DbHandler
     
     /* ------------- `saved_reports` table methods ------------------ */
     
+    public function getDataReport($userid, $reportid)
+    {
+        //grab the lastest report ID and return it
+        $stmt = $this->conn->prepare("
+            SELECT data FROM `saved_reports` 
+            WHERE userid = ? AND reportid = ?
+            ");
+        $stmt->bind_param("ii", $userid, $reportid);
+        if ($stmt->execute())
+        {
+            $stmt->bind_result($data);
+            $stmt->fetch();
+            $stmt->close();
+            return $data;
+        }
+        else
+        {
+            $stmt->close();
+            return NULL;
+        }
+    }
+    
     public function addDataReport($userid, $data)
     {
         //find how many existing save data reports are there for this user

@@ -176,7 +176,10 @@ $app->post('/register', function() use ($app)
     {
         $userid = $db->getUserIDbyEmail($email);
         
-        $result = $db->addExpirationDate($userid, 1);
+        $result = $db->addExpirationDate($userid, 9999);
+        
+        $emailer = new EmailHandler();
+        $emailer->sendWelcomeMail($email);
         
         $response["error"] = false;
         $response["message"] = OPERATION_SUCCESS;
@@ -1133,21 +1136,44 @@ $app->post('/upload_report_info', 'authenticate', function() use ($app)
 
     $userid = $db->getUserIDbyEmail($user_email);
 
-    $email = $app->request->post('email');
+    $emailToSendTo = $app->request->post('email');
     $rawjson = $app->request->post('report');
     
-    $result = $db->addDataReport($userid, $rawjson);
+    $reportid = $db->addDataReport($userid, $rawjson);
     
-    if ($result != NULL)
+    if ($reportid != NULL)
     {
-        $response["error"] = false;
-        $response["reportID"] = $result;
-        echoRespnse(200, $response);
+        //send email to user with link to open the data 
+        $accountInfoArray = $db->getUserDetailsByEmail($user_email);
+        $firstname = $accountInfoArray['first_name'];
+        $lastname = $accountInfoArray['last_name'];
+
+        $emailer = new EmailHandler();
+
+        $resultURL = "http://celitax.ca/year_summary.php?email=$user_email&reportid=$reportid";
+
+        $result = $emailer->sendYearSummaryLink($emailToSendTo, $resultURL, $firstname, $lastname);
+        
+        $resultcode = $result->http_response_code;
+
+        if ($resultcode == 200)
+        {
+            $response["error"] = false;
+            $response["resultURL"] = $resultURL;
+            echoRespnse(200, $response);
+        }
+        else
+        {
+            $response["error"] = true;
+            $response["message"] = "Failed to send an email to current user.";
+            $response["resultURL"] = $resultURL;
+            echoRespnse(400, $response);
+        }
     }
     else
     {
         $response["error"] = true;
-        $response["message"] = 'Failed to add new report for user';
+        $response["message"] = "Failed to save data report";
         echoRespnse(400, $response);
     }
 });

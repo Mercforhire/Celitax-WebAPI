@@ -270,7 +270,7 @@ function deleteProfileImage($userid)
 
             if (file_exists($filePath))
             {
-                chmod($filePath, 0755); //Change the file permissions if allowed
+                //chmod($filePath, 0755); //Change the file permissions if allowed
 
                 //remove the file
                 if ( !unlink($filePath) )
@@ -299,6 +299,8 @@ function deleteImage($filename, $userid)
 
     if (file_exists($filePath))
     {
+        //chmod($filePath, 0755); //Change the file permissions if allowed
+        
         unlink($filePath);
     }
 }
