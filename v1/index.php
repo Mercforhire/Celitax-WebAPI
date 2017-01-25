@@ -780,18 +780,9 @@ $app->post('/submit_feedback', 'authenticate', function() use ($app)
     
     $emailer->notifyAppFeedback($firstname . " " . $lastname, $user_email, $feedback_text);
 
-    if ($result)
-    {
-        $response["error"] = false;
-        $response["message"] = OPERATION_SUCCESS;
-        echoRespnse(200, $response);
-    }
-    else
-    {
-        $response["error"] = true;
-        $response["message"] = UNKNOWN_ERROR;
-        echoRespnse(400, $response);
-    }
+    $response["error"] = false;
+    $response["message"] = OPERATION_SUCCESS;
+    echoRespnse(200, $response);
 });
 
 /**
