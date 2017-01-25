@@ -19,7 +19,7 @@ class EmailHandler
     function __construct()
     {
         $this->mgClient = new Mailgun('key-01zs3m0dem69g1gxdmikjyeevl45ms81');
-        $this->domain = 'sandbox78922.mailgun.org';
+        $this->domain = 'celitax.ca';
     }
 
     /**
