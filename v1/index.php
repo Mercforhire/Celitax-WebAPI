@@ -304,18 +304,9 @@ $app->post('/forgetpassword', function() use ($app)
 
         $result = $emailer->sendPasswordResetEmailWithToken($email, $tokenid, $firstname, $lastname);
         $resultcode = $result->http_response_code;
-        if ($resultcode == 200)
-        {
-            $response["error"] = false;
-            $response["account"] = $accountInfoArray;
-            echoRespnse(200, $response);
-        }
-        else
-        {
-            $response["error"] = true;
-            $response["message"] = "Failed to send a reset password email to selected user.";
-            echoRespnse(400, $response);
-        }
+        $response["error"] = false;
+        $response["account"] = $accountInfoArray;
+        echoRespnse(200, $response);
     }
     else
     {
@@ -1101,21 +1092,10 @@ $app->post('/request_receipts_info', 'authenticate', function() use ($app)
     $emailer = new EmailHandler();
     
     $result = $emailer->sendReceiptDownloadLink($email, $resultURL, $firstname, $lastname);        
-    $resultcode = $result->http_response_code;
     
-    if ($resultcode == 200)
-    {
-        $response["error"] = false;
-        $response["resultURL"] = $resultURL;
-        echoRespnse(200, $response);
-    }
-    else
-    {
-        $response["error"] = true;
-        $response["message"] = "Failed to send an email to current user.";
-        $response["resultURL"] = $resultURL;
-        echoRespnse(400, $response);
-    }
+    $response["error"] = false;
+    $response["resultURL"] = $resultURL;
+    echoRespnse(200, $response);
 });
 
 /**
@@ -1154,21 +1134,9 @@ $app->post('/upload_report_info', 'authenticate', function() use ($app)
 
         $result = $emailer->sendYearSummaryLink($emailToSendTo, $resultURL, $firstname, $lastname);
         
-        $resultcode = $result->http_response_code;
-
-        if ($resultcode == 200)
-        {
-            $response["error"] = false;
-            $response["resultURL"] = $resultURL;
-            echoRespnse(200, $response);
-        }
-        else
-        {
-            $response["error"] = true;
-            $response["message"] = "Failed to send an email to current user.";
-            $response["resultURL"] = $resultURL;
-            echoRespnse(400, $response);
-        }
+        $response["error"] = false;
+        $response["resultURL"] = $resultURL;
+        echoRespnse(200, $response);
     }
     else
     {
